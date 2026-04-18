@@ -41,7 +41,7 @@ class LedgerManager:
         if amount <= 0:
             return None
         
-        if account.account_type != AccountType.NETWORK_PAYMENT:
+        if account.account_type not in [AccountType.NETWORK_PAYMENT, AccountType.LOAN]:
             if account.balance < amount:
                 return None
 
@@ -71,7 +71,7 @@ class LedgerManager:
         if amount <= 0:
             return None
         
-        if from_account.account_type != AccountType.NETWORK_PAYMENT:
+        if from_account.account_type not in [AccountType.NETWORK_PAYMENT, AccountType.LOAN]:
             if from_account.balance < amount:
                 return None
 
@@ -135,7 +135,7 @@ class LedgerManager:
         elif new_type == TransactionType.EXPENSE:
             new_account = self.storage.get_account(new_account_id)
             if new_account:
-                if new_account.account_type != AccountType.NETWORK_PAYMENT:
+                if new_account.account_type not in [AccountType.NETWORK_PAYMENT, AccountType.LOAN]:
                     if new_account.balance < new_amount:
                         if old_type == TransactionType.INCOME:
                             old_account = self.storage.get_account(old_account_id)
@@ -157,7 +157,7 @@ class LedgerManager:
             new_from = self.storage.get_account(new_account_id)
             new_to = self.storage.get_account(new_target_id)
             if new_from and new_to:
-                if new_from.account_type != AccountType.NETWORK_PAYMENT:
+                if new_from.account_type not in [AccountType.NETWORK_PAYMENT, AccountType.LOAN]:
                     if new_from.balance < new_amount:
                         if old_type == TransactionType.INCOME:
                             old_account = self.storage.get_account(old_account_id)

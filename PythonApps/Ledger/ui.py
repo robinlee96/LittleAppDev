@@ -106,6 +106,7 @@ class LedgerApp:
         self.combo_account_type = ttk.Combobox(frame_input, values=[t.value for t in AccountType], state="readonly", width=32)
         self.combo_account_type.current(0)
         self.combo_account_type.grid(row=1, column=1, padx=8, pady=6)
+        self.combo_account_type.bind("&lt;&lt;ComboboxSelected&gt;&gt;", self._on_account_type_changed)
 
         ttk.Label(frame_input, text="当前余额:").grid(row=2, column=0, sticky=tk.W, pady=6)
         self.entry_account_balance = ttk.Entry(frame_input, width=35)
@@ -587,6 +588,19 @@ class LedgerApp:
 
     def _on_trans_filter_changed(self, event):
         self._refresh_transactions()
+
+    def _on_account_type_changed(self, event):
+        if not self.editing_account_id:
+            type_str = self.combo_account_type.get()
+            account_type = None
+            for t in AccountType:
+                if t.value == type_str:
+                    account_type = t
+                    break
+            
+            if account_type == AccountType.LOAN:
+                self.entry_account_balance.delete(0, tk.END)
+                self.entry_account_balance.insert(0, "0.00")
 
     def _add_or_update_account(self):
         if self.editing_account_id:
