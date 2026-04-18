@@ -1,6 +1,6 @@
 
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog, Toplevel
 from datetime import datetime
 from typing import Optional
 from models import Account, AccountType, TransactionType, Category
@@ -19,6 +19,8 @@ class LedgerApp:
 
         self.current_account_id: Optional[str] = None
         self.current_category_root_id: Optional[str] = None
+        self.editing_account_id: Optional[str] = None
+        self.editing_transaction_id: Optional[str] = None
 
         self._create_widgets()
         self._refresh_data()
@@ -63,7 +65,7 @@ class LedgerApp:
         self.combo_account_type.current(0)
         self.combo_account_type.grid(row=1, column=1, padx=5, pady=5)
 
-        ttk.Label(frame_input, text="初始余额:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Label(frame_input, text="当前余额:").grid(row=2, column=0, sticky=tk.W, pady=5)
         self.entry_account_balance = ttk.Entry(frame_input, width=30)
         self.entry_account_balance.grid(row=2, column=1, padx=5, pady=5)
 
@@ -73,9 +75,9 @@ class LedgerApp:
 
         frame_buttons = ttk.Frame(frame_input)
         frame_buttons.grid(row=4, column=0, columnspan=2, pady=10)
-        self.btn_add_account = ttk.Button(frame_buttons, text="添加账户", command=self._add_account)
+        self.btn_add_account = ttk.Button(frame_buttons, text="添加账户", command=self._add_or_update_account)
         self.btn_add_account.pack(side=tk.LEFT, padx=5)
-        self.btn_clear_account = ttk.Button(frame_buttons, text="清空", command=self._clear_account_form)
+        self.btn_clear_account = ttk.Button(frame_buttons, text="清空/取消编辑", command=self._clear_account_form)
         self.btn_clear_account.pack(side=tk.LEFT, padx=5)
 
         frame_list = ttk.LabelFrame(self.tab_accounts, text="账户列表", padding=10)
@@ -103,6 +105,7 @@ class LedgerApp:
 
         frame_actions = ttk.Frame(frame_list)
         frame_actions.pack(fill=tk.X, pady=10)
+        ttk.Button(frame_actions, text="编辑选中账户", command=self._edit_account).pack(side=tk.LEFT, padx=5)
         ttk.Button(frame_actions, text="删除选中账户", command=self._delete_account).pack(side=tk.RIGHT)
 
     def _create_ledger_tab(self):
@@ -136,65 +139,104 @@ class LedgerApp:
         frame = ttk.Frame(self.tab_income, padding=20)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text="金额:").grid(row=0, column=0, sticky=tk.W, pady=10)
-        self.entry_income_amount = ttk.Entry(frame, width=30)
-        self.entry_income_amount.grid(row=0, column=1, padx=10, pady=10)
+        ttk.Label(frame, text="发生时间:").grid(row=0, column=0, sticky=tk.W, pady=10)
+        frame_time_income = ttk.Frame(frame)
+        frame_time_income.grid(row=0, column=1, sticky=tk.W, pady=10)
+        
+        now = datetime.now()
+        self.entry_income_date = ttk.Entry(frame_time_income, width=12)
+        self.entry_income_date.insert(0, now.strftime("%Y-%m-%d"))
+        self.entry_income_date.pack(side=tk.LEFT, padx=2)
+        ttk.Label(frame_time_income, text=" ").pack(side=tk.LEFT)
+        self.entry_income_time = ttk.Entry(frame_time_income, width=10)
+        self.entry_income_time.insert(0, now.strftime("%H:%M:%S"))
+        self.entry_income_time.pack(side=tk.LEFT, padx=2)
 
-        ttk.Label(frame, text="主类别:").grid(row=1, column=0, sticky=tk.W, pady=10)
+        ttk.Label(frame, text="金额:").grid(row=1, column=0, sticky=tk.W, pady=10)
+        self.entry_income_amount = ttk.Entry(frame, width=30)
+        self.entry_income_amount.grid(row=1, column=1, padx=10, pady=10)
+
+        ttk.Label(frame, text="主类别:").grid(row=2, column=0, sticky=tk.W, pady=10)
         self.combo_income_parent = ttk.Combobox(frame, state="readonly", width=27)
-        self.combo_income_parent.grid(row=1, column=1, padx=10, pady=10)
+        self.combo_income_parent.grid(row=2, column=1, padx=10, pady=10)
         self.combo_income_parent.bind("<<ComboboxSelected>>", self._on_income_parent_changed)
 
-        ttk.Label(frame, text="子类别:").grid(row=2, column=0, sticky=tk.W, pady=10)
+        ttk.Label(frame, text="子类别:").grid(row=3, column=0, sticky=tk.W, pady=10)
         self.combo_income_child = ttk.Combobox(frame, state="readonly", width=27)
-        self.combo_income_child.grid(row=2, column=1, padx=10, pady=10)
+        self.combo_income_child.grid(row=3, column=1, padx=10, pady=10)
 
-        ttk.Label(frame, text="备注:").grid(row=3, column=0, sticky=tk.W, pady=10)
+        ttk.Label(frame, text="备注:").grid(row=4, column=0, sticky=tk.W, pady=10)
         self.entry_income_desc = ttk.Entry(frame, width=30)
-        self.entry_income_desc.grid(row=3, column=1, padx=10, pady=10)
+        self.entry_income_desc.grid(row=4, column=1, padx=10, pady=10)
 
-        ttk.Button(frame, text="记录收入", command=self._add_income).grid(row=4, column=0, columnspan=2, pady=20)
+        ttk.Button(frame, text="记录收入", command=self._add_income).grid(row=5, column=0, columnspan=2, pady=20)
 
     def _create_expense_widgets(self):
         frame = ttk.Frame(self.tab_expense, padding=20)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text="金额:").grid(row=0, column=0, sticky=tk.W, pady=10)
-        self.entry_expense_amount = ttk.Entry(frame, width=30)
-        self.entry_expense_amount.grid(row=0, column=1, padx=10, pady=10)
+        ttk.Label(frame, text="发生时间:").grid(row=0, column=0, sticky=tk.W, pady=10)
+        frame_time_expense = ttk.Frame(frame)
+        frame_time_expense.grid(row=0, column=1, sticky=tk.W, pady=10)
+        
+        now = datetime.now()
+        self.entry_expense_date = ttk.Entry(frame_time_expense, width=12)
+        self.entry_expense_date.insert(0, now.strftime("%Y-%m-%d"))
+        self.entry_expense_date.pack(side=tk.LEFT, padx=2)
+        ttk.Label(frame_time_expense, text=" ").pack(side=tk.LEFT)
+        self.entry_expense_time = ttk.Entry(frame_time_expense, width=10)
+        self.entry_expense_time.insert(0, now.strftime("%H:%M:%S"))
+        self.entry_expense_time.pack(side=tk.LEFT, padx=2)
 
-        ttk.Label(frame, text="主类别:").grid(row=1, column=0, sticky=tk.W, pady=10)
+        ttk.Label(frame, text="金额:").grid(row=1, column=0, sticky=tk.W, pady=10)
+        self.entry_expense_amount = ttk.Entry(frame, width=30)
+        self.entry_expense_amount.grid(row=1, column=1, padx=10, pady=10)
+
+        ttk.Label(frame, text="主类别:").grid(row=2, column=0, sticky=tk.W, pady=10)
         self.combo_expense_parent = ttk.Combobox(frame, state="readonly", width=27)
-        self.combo_expense_parent.grid(row=1, column=1, padx=10, pady=10)
+        self.combo_expense_parent.grid(row=2, column=1, padx=10, pady=10)
         self.combo_expense_parent.bind("<<ComboboxSelected>>", self._on_expense_parent_changed)
 
-        ttk.Label(frame, text="子类别:").grid(row=2, column=0, sticky=tk.W, pady=10)
+        ttk.Label(frame, text="子类别:").grid(row=3, column=0, sticky=tk.W, pady=10)
         self.combo_expense_child = ttk.Combobox(frame, state="readonly", width=27)
-        self.combo_expense_child.grid(row=2, column=1, padx=10, pady=10)
+        self.combo_expense_child.grid(row=3, column=1, padx=10, pady=10)
 
-        ttk.Label(frame, text="备注:").grid(row=3, column=0, sticky=tk.W, pady=10)
+        ttk.Label(frame, text="备注:").grid(row=4, column=0, sticky=tk.W, pady=10)
         self.entry_expense_desc = ttk.Entry(frame, width=30)
-        self.entry_expense_desc.grid(row=3, column=1, padx=10, pady=10)
+        self.entry_expense_desc.grid(row=4, column=1, padx=10, pady=10)
 
-        ttk.Button(frame, text="记录支出", command=self._add_expense).grid(row=4, column=0, columnspan=2, pady=20)
+        ttk.Button(frame, text="记录支出", command=self._add_expense).grid(row=5, column=0, columnspan=2, pady=20)
 
     def _create_transfer_widgets(self):
         frame = ttk.Frame(self.tab_transfer, padding=20)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text="金额:").grid(row=0, column=0, sticky=tk.W, pady=10)
+        ttk.Label(frame, text="发生时间:").grid(row=0, column=0, sticky=tk.W, pady=10)
+        frame_time_transfer = ttk.Frame(frame)
+        frame_time_transfer.grid(row=0, column=1, sticky=tk.W, pady=10)
+        
+        now = datetime.now()
+        self.entry_transfer_date = ttk.Entry(frame_time_transfer, width=12)
+        self.entry_transfer_date.insert(0, now.strftime("%Y-%m-%d"))
+        self.entry_transfer_date.pack(side=tk.LEFT, padx=2)
+        ttk.Label(frame_time_transfer, text=" ").pack(side=tk.LEFT)
+        self.entry_transfer_time = ttk.Entry(frame_time_transfer, width=10)
+        self.entry_transfer_time.insert(0, now.strftime("%H:%M:%S"))
+        self.entry_transfer_time.pack(side=tk.LEFT, padx=2)
+
+        ttk.Label(frame, text="金额:").grid(row=1, column=0, sticky=tk.W, pady=10)
         self.entry_transfer_amount = ttk.Entry(frame, width=30)
-        self.entry_transfer_amount.grid(row=0, column=1, padx=10, pady=10)
+        self.entry_transfer_amount.grid(row=1, column=1, padx=10, pady=10)
 
-        ttk.Label(frame, text="转入账户:").grid(row=1, column=0, sticky=tk.W, pady=10)
+        ttk.Label(frame, text="转入账户:").grid(row=2, column=0, sticky=tk.W, pady=10)
         self.combo_transfer_to = ttk.Combobox(frame, state="readonly", width=27)
-        self.combo_transfer_to.grid(row=1, column=1, padx=10, pady=10)
+        self.combo_transfer_to.grid(row=2, column=1, padx=10, pady=10)
 
-        ttk.Label(frame, text="备注:").grid(row=2, column=0, sticky=tk.W, pady=10)
+        ttk.Label(frame, text="备注:").grid(row=3, column=0, sticky=tk.W, pady=10)
         self.entry_transfer_desc = ttk.Entry(frame, width=30)
-        self.entry_transfer_desc.grid(row=2, column=1, padx=10, pady=10)
+        self.entry_transfer_desc.grid(row=3, column=1, padx=10, pady=10)
 
-        ttk.Button(frame, text="执行转账", command=self._transfer).grid(row=3, column=0, columnspan=2, pady=20)
+        ttk.Button(frame, text="执行转账", command=self._transfer).grid(row=4, column=0, columnspan=2, pady=20)
 
     def _create_transactions_tab(self):
         frame_filter = ttk.Frame(self.tab_transactions, padding=10)
@@ -203,12 +245,14 @@ class LedgerApp:
         ttk.Label(frame_filter, text="年份:").pack(side=tk.LEFT, padx=5)
         self.combo_export_year = ttk.Combobox(frame_filter, state="readonly", width=10)
         self.combo_export_year.pack(side=tk.LEFT, padx=5)
+        self.combo_export_year.bind("<<ComboboxSelected>>", self._on_trans_filter_changed)
 
         ttk.Label(frame_filter, text="月份:").pack(side=tk.LEFT, padx=5)
         months = ["全部"] + [str(i) for i in range(1, 13)]
         self.combo_export_month = ttk.Combobox(frame_filter, values=months, state="readonly", width=8)
         self.combo_export_month.current(0)
         self.combo_export_month.pack(side=tk.LEFT, padx=5)
+        self.combo_export_month.bind("<<ComboboxSelected>>", self._on_trans_filter_changed)
 
         ttk.Button(frame_filter, text="导出Excel", command=self._export_excel).pack(side=tk.LEFT, padx=20)
         ttk.Button(frame_filter, text="刷新", command=self._refresh_transactions).pack(side=tk.RIGHT)
@@ -240,6 +284,7 @@ class LedgerApp:
 
         frame_actions = ttk.Frame(frame_list)
         frame_actions.pack(fill=tk.X, pady=10)
+        ttk.Button(frame_actions, text="编辑选中交易", command=self._edit_transaction).pack(side=tk.LEFT, padx=5)
         ttk.Button(frame_actions, text="撤销选中交易", command=self._revert_transaction).pack(side=tk.RIGHT)
 
     def _create_statistics_tab(self):
@@ -255,11 +300,13 @@ class LedgerApp:
         ttk.Label(frame_control, text="年份:").pack(side=tk.LEFT, padx=5)
         self.combo_stat_year = ttk.Combobox(frame_control, state="readonly", width=10)
         self.combo_stat_year.pack(side=tk.LEFT, padx=5)
+        self.combo_stat_year.bind("<<ComboboxSelected>>", self._on_stat_year_changed)
 
         ttk.Label(frame_control, text="月份:").pack(side=tk.LEFT, padx=5)
         months = [str(i) for i in range(1, 13)]
         self.combo_stat_month = ttk.Combobox(frame_control, values=months, state="readonly", width=8)
         self.combo_stat_month.pack(side=tk.LEFT, padx=5)
+        self.combo_stat_month.bind("<<ComboboxSelected>>", self._on_stat_month_changed)
 
         ttk.Button(frame_control, text="刷新统计", command=self._refresh_statistics).pack(side=tk.LEFT, padx=20)
 
@@ -368,7 +415,19 @@ class LedgerApp:
     def _refresh_transactions(self):
         for item in self.tree_transactions.get_children():
             self.tree_transactions.delete(item)
+        
         transactions = sorted(self.storage.get_all_transactions(), key=lambda x: x.created_at, reverse=True)
+        
+        year_str = self.combo_export_year.get()
+        month_str = self.combo_export_month.get()
+        
+        if year_str and year_str != "全部":
+            year = int(year_str)
+            transactions = [t for t in transactions if t.created_at.year == year]
+            if month_str and month_str != "全部":
+                month = int(month_str)
+                transactions = [t for t in transactions if t.created_at.month == month]
+        
         for t in transactions:
             account = self.storage.get_account(t.account_id)
             account_name = account.name if account else "-"
@@ -469,7 +528,22 @@ class LedgerApp:
             self.combo_expense_child.current(0)
 
     def _on_stat_period_changed(self, event):
-        pass
+        self._refresh_statistics()
+
+    def _on_stat_year_changed(self, event):
+        self._refresh_statistics()
+
+    def _on_stat_month_changed(self, event):
+        self._refresh_statistics()
+
+    def _on_trans_filter_changed(self, event):
+        self._refresh_transactions()
+
+    def _add_or_update_account(self):
+        if self.editing_account_id:
+            self._update_account()
+        else:
+            self._add_account()
 
     def _add_account(self):
         name = self.entry_account_name.get().strip()
@@ -506,11 +580,82 @@ class LedgerApp:
         self._clear_account_form()
         self._refresh_data()
 
+    def _update_account(self):
+        name = self.entry_account_name.get().strip()
+        type_str = self.combo_account_type.get()
+        balance_str = self.entry_account_balance.get().strip()
+        bank_name = self.entry_bank_name.get().strip() or None
+
+        if not name:
+            messagebox.showwarning("提示", "请输入账户名称")
+            return
+        if not type_str:
+            messagebox.showwarning("提示", "请选择账户类型")
+            return
+
+        account_type = None
+        for t in AccountType:
+            if t.value == type_str:
+                account_type = t
+                break
+
+        account = self.storage.get_account(self.editing_account_id)
+        if not account:
+            return
+
+        try:
+            new_balance = float(balance_str)
+        except ValueError:
+            messagebox.showwarning("提示", "余额格式不正确")
+            return
+
+        if abs(new_balance - account.balance) > 0.001:
+            if not messagebox.askyesno("确认", f"余额从 {account.balance:.2f} 变为 {new_balance:.2f}，是否创建余额校正交易？"):
+                new_balance = account.balance
+            else:
+                self.ledger.update_account_balance(self.editing_account_id, new_balance, "余额校正")
+
+        self.storage.update_account(self.editing_account_id, name=name, account_type=account_type, bank_name=bank_name)
+        messagebox.showinfo("成功", "账户更新成功")
+        self._clear_account_form()
+        self._refresh_data()
+
+    def _edit_account(self):
+        selected = self.tree_accounts.selection()
+        if not selected:
+            messagebox.showwarning("提示", "请选择要编辑的账户")
+            return
+        item = self.tree_accounts.item(selected[0])
+        account_id = item["tags"][0]
+        account = self.storage.get_account(account_id)
+        if not account:
+            return
+
+        self.editing_account_id = account_id
+        self.entry_account_name.delete(0, tk.END)
+        self.entry_account_name.insert(0, account.name)
+        
+        for i, t in enumerate(AccountType):
+            if t == account.account_type:
+                self.combo_account_type.current(i)
+                break
+
+        self.entry_account_balance.delete(0, tk.END)
+        self.entry_account_balance.insert(0, f"{account.balance:.2f}")
+        
+        self.entry_bank_name.delete(0, tk.END)
+        if account.bank_name:
+            self.entry_bank_name.insert(0, account.bank_name)
+        
+        self.btn_add_account.config(text="更新账户")
+
     def _clear_account_form(self):
+        self.editing_account_id = None
         self.entry_account_name.delete(0, tk.END)
         self.combo_account_type.current(0)
         self.entry_account_balance.delete(0, tk.END)
         self.entry_bank_name.delete(0, tk.END)
+        self.btn_add_account.config(text="添加账户")
 
     def _delete_account(self):
         selected = self.tree_accounts.selection()
@@ -524,6 +669,15 @@ class LedgerApp:
             self.storage.delete_account(account_id)
             self._refresh_data()
 
+    def _parse_datetime(self, date_str: str, time_str: str) -> Optional[datetime]:
+        try:
+            return datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
+        except:
+            try:
+                return datetime.strptime(date_str, "%Y-%m-%d")
+            except:
+                return None
+
     def _add_income(self):
         if not self.current_account_id:
             messagebox.showwarning("提示", "请先选择账户")
@@ -533,6 +687,13 @@ class LedgerApp:
         parent_idx = self.combo_income_parent.current()
         child_idx = self.combo_income_child.current()
         description = self.entry_income_desc.get().strip()
+        date_str = self.entry_income_date.get().strip()
+        time_str = self.entry_income_time.get().strip()
+        
+        created_at = self._parse_datetime(date_str, time_str)
+        if not created_at:
+            messagebox.showwarning("提示", "时间格式不正确，使用当前时间")
+            created_at = datetime.now()
 
         try:
             amount = float(amount_str)
@@ -554,11 +715,16 @@ class LedgerApp:
                     category_name = f"{parent.name} - {children[child_idx_adj].name}"
                     category_id = children[child_idx_adj].id
 
-        transaction = self.ledger.add_income(self.current_account_id, amount, category_name, description, category_id)
+        transaction = self.ledger.add_income(self.current_account_id, amount, category_name, description, category_id, created_at)
         if transaction:
             messagebox.showinfo("成功", "收入记录成功")
             self.entry_income_amount.delete(0, tk.END)
             self.entry_income_desc.delete(0, tk.END)
+            now = datetime.now()
+            self.entry_income_date.delete(0, tk.END)
+            self.entry_income_date.insert(0, now.strftime("%Y-%m-%d"))
+            self.entry_income_time.delete(0, tk.END)
+            self.entry_income_time.insert(0, now.strftime("%H:%M:%S"))
             self._refresh_data()
         else:
             messagebox.showerror("错误", "记录失败")
@@ -572,6 +738,13 @@ class LedgerApp:
         parent_idx = self.combo_expense_parent.current()
         child_idx = self.combo_expense_child.current()
         description = self.entry_expense_desc.get().strip()
+        date_str = self.entry_expense_date.get().strip()
+        time_str = self.entry_expense_time.get().strip()
+        
+        created_at = self._parse_datetime(date_str, time_str)
+        if not created_at:
+            messagebox.showwarning("提示", "时间格式不正确，使用当前时间")
+            created_at = datetime.now()
 
         try:
             amount = float(amount_str)
@@ -593,11 +766,16 @@ class LedgerApp:
                     category_name = f"{parent.name} - {children[child_idx_adj].name}"
                     category_id = children[child_idx_adj].id
 
-        transaction = self.ledger.add_expense(self.current_account_id, amount, category_name, description, category_id)
+        transaction = self.ledger.add_expense(self.current_account_id, amount, category_name, description, category_id, created_at)
         if transaction:
             messagebox.showinfo("成功", "支出记录成功")
             self.entry_expense_amount.delete(0, tk.END)
             self.entry_expense_desc.delete(0, tk.END)
+            now = datetime.now()
+            self.entry_expense_date.delete(0, tk.END)
+            self.entry_expense_date.insert(0, now.strftime("%Y-%m-%d"))
+            self.entry_expense_time.delete(0, tk.END)
+            self.entry_expense_time.insert(0, now.strftime("%H:%M:%S"))
             self._refresh_data()
         else:
             messagebox.showerror("错误", "记录失败，请检查余额是否足够")
@@ -614,6 +792,13 @@ class LedgerApp:
 
         amount_str = self.entry_transfer_amount.get().strip()
         description = self.entry_transfer_desc.get().strip()
+        date_str = self.entry_transfer_date.get().strip()
+        time_str = self.entry_transfer_time.get().strip()
+        
+        created_at = self._parse_datetime(date_str, time_str)
+        if not created_at:
+            messagebox.showwarning("提示", "时间格式不正确，使用当前时间")
+            created_at = datetime.now()
 
         try:
             amount = float(amount_str)
@@ -626,14 +811,102 @@ class LedgerApp:
             return
         to_account_id = accounts[to_index].id
 
-        transaction = self.ledger.transfer(self.current_account_id, to_account_id, amount, "转账", description)
+        transaction = self.ledger.transfer(self.current_account_id, to_account_id, amount, "转账", description, created_at)
         if transaction:
             messagebox.showinfo("成功", "转账成功")
             self.entry_transfer_amount.delete(0, tk.END)
             self.entry_transfer_desc.delete(0, tk.END)
+            now = datetime.now()
+            self.entry_transfer_date.delete(0, tk.END)
+            self.entry_transfer_date.insert(0, now.strftime("%Y-%m-%d"))
+            self.entry_transfer_time.delete(0, tk.END)
+            self.entry_transfer_time.insert(0, now.strftime("%H:%M:%S"))
             self._refresh_data()
         else:
             messagebox.showerror("错误", "转账失败，请检查余额是否足够")
+
+    def _edit_transaction(self):
+        selected = self.tree_transactions.selection()
+        if not selected:
+            messagebox.showwarning("提示", "请选择要编辑的交易")
+            return
+        item = self.tree_transactions.item(selected[0])
+        transaction_id = item["tags"][0]
+        transaction = self.storage.get_transaction(transaction_id)
+        if not transaction:
+            return
+
+        edit_window = Toplevel(self.root)
+        edit_window.title("编辑交易")
+        edit_window.geometry("500x450")
+
+        ttk.Label(edit_window, text="类型:").grid(row=0, column=0, sticky=tk.W, pady=10, padx=20)
+        combo_type = ttk.Combobox(edit_window, values=[t.value for t in TransactionType], state="readonly", width=30)
+        for i, t in enumerate(TransactionType):
+            if t == transaction.transaction_type:
+                combo_type.current(i)
+        combo_type.grid(row=0, column=1, sticky=tk.W, pady=10)
+
+        ttk.Label(edit_window, text="金额:").grid(row=1, column=0, sticky=tk.W, pady=10, padx=20)
+        entry_amount = ttk.Entry(edit_window, width=30)
+        entry_amount.insert(0, f"{transaction.amount:.2f}")
+        entry_amount.grid(row=1, column=1, sticky=tk.W, pady=10)
+
+        ttk.Label(edit_window, text="类别:").grid(row=2, column=0, sticky=tk.W, pady=10, padx=20)
+        entry_category = ttk.Entry(edit_window, width=30)
+        entry_category.insert(0, transaction.category)
+        entry_category.grid(row=2, column=1, sticky=tk.W, pady=10)
+
+        ttk.Label(edit_window, text="备注:").grid(row=3, column=0, sticky=tk.W, pady=10, padx=20)
+        entry_desc = ttk.Entry(edit_window, width=30)
+        entry_desc.insert(0, transaction.description)
+        entry_desc.grid(row=3, column=1, sticky=tk.W, pady=10)
+
+        ttk.Label(edit_window, text="发生时间:").grid(row=4, column=0, sticky=tk.W, pady=10, padx=20)
+        frame_time = ttk.Frame(edit_window)
+        frame_time.grid(row=4, column=1, sticky=tk.W, pady=10)
+        entry_date = ttk.Entry(frame_time, width=12)
+        entry_date.insert(0, transaction.created_at.strftime("%Y-%m-%d"))
+        entry_date.pack(side=tk.LEFT, padx=2)
+        ttk.Label(frame_time, text=" ").pack(side=tk.LEFT)
+        entry_time = ttk.Entry(frame_time, width=10)
+        entry_time.insert(0, transaction.created_at.strftime("%H:%M:%S"))
+        entry_time.pack(side=tk.LEFT, padx=2)
+
+        def save_edit():
+            try:
+                amount = float(entry_amount.get().strip())
+            except ValueError:
+                messagebox.showwarning("提示", "金额格式不正确")
+                return
+
+            created_at = self._parse_datetime(entry_date.get().strip(), entry_time.get().strip())
+            if not created_at:
+                messagebox.showwarning("提示", "时间格式不正确")
+                return
+
+            type_str = combo_type.get()
+            trans_type = None
+            for t in TransactionType:
+                if t.value == type_str:
+                    trans_type = t
+                    break
+
+            if self.ledger.update_transaction(
+                transaction_id,
+                transaction_type=trans_type,
+                amount=amount,
+                category=entry_category.get().strip(),
+                description=entry_desc.get().strip(),
+                created_at=created_at
+            ):
+                messagebox.showinfo("成功", "交易更新成功")
+                edit_window.destroy()
+                self._refresh_data()
+            else:
+                messagebox.showerror("错误", "交易更新失败，请检查余额是否足够")
+
+        ttk.Button(edit_window, text="保存", command=save_edit).grid(row=5, column=0, columnspan=2, pady=20)
 
     def _revert_transaction(self):
         selected = self.tree_transactions.selection()

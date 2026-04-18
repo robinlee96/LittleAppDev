@@ -1,7 +1,7 @@
 
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict, List
-from models import Account, Transaction, TransactionType
+from models import Account, Transaction, TransactionType, AccountType
 from storage import StorageManager
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
@@ -11,7 +11,7 @@ class LedgerManager:
     def __init__(self, storage: StorageManager):
         self.storage = storage
 
-    def add_income(self, account_id: str, amount: float, category: str, description: str = "", category_id: Optional[str] = None) -> Optional[Transaction]:
+    def add_income(self, account_id: str, amount: float, category: str, description: str = "", category_id: Optional[str] = None, created_at: Optional[datetime] = None) -> Optional[Transaction]:
         account = self.storage.get_account(account_id)
         if not account:
             return None
@@ -25,7 +25,7 @@ class LedgerManager:
             category=category,
             description=description,
             account_id=account_id,
-            created_at=datetime.now()
+            created_at=created_at or datetime.now()
         )
         self.storage.add_transaction(transaction)
 
@@ -34,14 +34,16 @@ class LedgerManager:
 
         return transaction
 
-    def add_expense(self, account_id: str, amount: float, category: str, description: str = "", category_id: Optional[str] = None) -> Optional[Transaction]:
+    def add_expense(self, account_id: str, amount: float, category: str, description: str = "", category_id: Optional[str] = None, created_at: Optional[datetime] = None) -> Optional[Transaction]:
         account = self.storage.get_account(account_id)
         if not account:
             return None
         if amount <= 0:
             return None
-        if account.balance < amount:
-            return None
+        
+        if account.account_type != AccountType.NETWORK_PAYMENT:
+            if account.balance < amount:
+                return None
 
         transaction = Transaction(
             transaction_type=TransactionType.EXPENSE,
@@ -50,7 +52,7 @@ class LedgerManager:
             category=category,
             description=description,
             account_id=account_id,
-            created_at=datetime.now()
+            created_at=created_at or datetime.now()
         )
         self.storage.add_transaction(transaction)
 
@@ -59,7 +61,7 @@ class LedgerManager:
 
         return transaction
 
-    def transfer(self, from_account_id: str, to_account_id: str, amount: float, category: str = "转账", description: str = "") -> Optional[Transaction]:
+    def transfer(self, from_account_id: str, to_account_id: str, amount: float, category: str = "转账", description: str = "", created_at: Optional[datetime] = None) -> Optional[Transaction]:
         from_account = self.storage.get_account(from_account_id)
         to_account = self.storage.get_account(to_account_id)
         if not from_account or not to_account:
@@ -68,8 +70,10 @@ class LedgerManager:
             return None
         if amount <= 0:
             return None
-        if from_account.balance < amount:
-            return None
+        
+        if from_account.account_type != AccountType.NETWORK_PAYMENT:
+            if from_account.balance < amount:
+                return None
 
         transaction = Transaction(
             transaction_type=TransactionType.TRANSFER,
@@ -78,7 +82,7 @@ class LedgerManager:
             description=description,
             account_id=from_account_id,
             target_account_id=to_account_id,
-            created_at=datetime.now()
+            created_at=created_at or datetime.now()
         )
         self.storage.add_transaction(transaction)
 
@@ -89,6 +93,113 @@ class LedgerManager:
         self.storage.update_account(to_account_id, balance=new_to_balance)
 
         return transaction
+
+    def update_transaction(self, transaction_id: str, **kwargs) -> bool:
+        transaction = self.storage.get_transaction(transaction_id)
+        if not transaction:
+            return False
+        
+        old_amount = transaction.amount
+        old_type = transaction.transaction_type
+        old_account_id = transaction.account_id
+        old_target_id = transaction.target_account_id
+        
+        if old_type == TransactionType.INCOME:
+            old_account = self.storage.get_account(old_account_id)
+            if old_account:
+                self.storage.update_account(old_account_id, balance=old_account.balance - old_amount)
+        elif old_type == TransactionType.EXPENSE:
+            old_account = self.storage.get_account(old_account_id)
+            if old_account:
+                self.storage.update_account(old_account_id, balance=old_account.balance + old_amount)
+        elif old_type == TransactionType.TRANSFER:
+            old_from = self.storage.get_account(old_account_id)
+            old_to = self.storage.get_account(old_target_id)
+            if old_from and old_to:
+                self.storage.update_account(old_account_id, balance=old_from.balance + old_amount)
+                self.storage.update_account(old_target_id, balance=old_to.balance - old_amount)
+        
+        for key, value in kwargs.items():
+            if hasattr(transaction, key):
+                setattr(transaction, key, value)
+        
+        new_amount = transaction.amount
+        new_type = transaction.transaction_type
+        new_account_id = transaction.account_id
+        new_target_id = transaction.target_account_id
+        
+        if new_type == TransactionType.INCOME:
+            new_account = self.storage.get_account(new_account_id)
+            if new_account:
+                self.storage.update_account(new_account_id, balance=new_account.balance + new_amount)
+        elif new_type == TransactionType.EXPENSE:
+            new_account = self.storage.get_account(new_account_id)
+            if new_account:
+                if new_account.account_type != AccountType.NETWORK_PAYMENT:
+                    if new_account.balance < new_amount:
+                        if old_type == TransactionType.INCOME:
+                            old_account = self.storage.get_account(old_account_id)
+                            if old_account:
+                                self.storage.update_account(old_account_id, balance=old_account.balance + old_amount)
+                        elif old_type == TransactionType.EXPENSE:
+                            old_account = self.storage.get_account(old_account_id)
+                            if old_account:
+                                self.storage.update_account(old_account_id, balance=old_account.balance - old_amount)
+                        elif old_type == TransactionType.TRANSFER:
+                            old_from = self.storage.get_account(old_account_id)
+                            old_to = self.storage.get_account(old_target_id)
+                            if old_from and old_to:
+                                self.storage.update_account(old_account_id, balance=old_from.balance - old_amount)
+                                self.storage.update_account(old_target_id, balance=old_to.balance + old_amount)
+                        return False
+                self.storage.update_account(new_account_id, balance=new_account.balance - new_amount)
+        elif new_type == TransactionType.TRANSFER:
+            new_from = self.storage.get_account(new_account_id)
+            new_to = self.storage.get_account(new_target_id)
+            if new_from and new_to:
+                if new_from.account_type != AccountType.NETWORK_PAYMENT:
+                    if new_from.balance < new_amount:
+                        if old_type == TransactionType.INCOME:
+                            old_account = self.storage.get_account(old_account_id)
+                            if old_account:
+                                self.storage.update_account(old_account_id, balance=old_account.balance + old_amount)
+                        elif old_type == TransactionType.EXPENSE:
+                            old_account = self.storage.get_account(old_account_id)
+                            if old_account:
+                                self.storage.update_account(old_account_id, balance=old_account.balance - old_amount)
+                        elif old_type == TransactionType.TRANSFER:
+                            old_from = self.storage.get_account(old_account_id)
+                            old_to = self.storage.get_account(old_target_id)
+                            if old_from and old_to:
+                                self.storage.update_account(old_account_id, balance=old_from.balance - old_amount)
+                                self.storage.update_account(old_target_id, balance=old_to.balance + old_amount)
+                        return False
+                self.storage.update_account(new_account_id, balance=new_from.balance - new_amount)
+                self.storage.update_account(new_target_id, balance=new_to.balance + new_amount)
+        
+        self.storage._save_data()
+        return True
+
+    def update_account_balance(self, account_id: str, new_balance: float, description: str = "余额校正") -> bool:
+        account = self.storage.get_account(account_id)
+        if not account:
+            return False
+        
+        diff = new_balance - account.balance
+        if abs(diff) < 0.001:
+            return True
+        
+        if diff > 0:
+            self.add_income(account_id, diff, "余额校正 - 收入", description)
+        else:
+            if account.account_type == AccountType.NETWORK_PAYMENT:
+                self.add_expense(account_id, -diff, "余额校正 - 支出", description)
+            else:
+                if account.balance + diff < 0:
+                    return False
+                self.add_expense(account_id, -diff, "余额校正 - 支出", description)
+        
+        return True
 
     def revert_transaction(self, transaction_id: str) -> bool:
         transaction = self.storage.get_transaction(transaction_id)
