@@ -250,35 +250,39 @@ class LedgerApp:
         ttk.Button(frame, text="记录支出", command=self._add_expense).grid(row=5, column=0, columnspan=2, pady=20)
 
     def _create_transfer_widgets(self):
-        frame = ttk.Frame(self.tab_transfer, padding=20)
+        frame = ttk.Frame(self.tab_transfer, padding=30)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text="发生时间:").grid(row=0, column=0, sticky=tk.W, pady=10)
+        ttk.Label(frame, text="发生时间:").grid(row=0, column=0, sticky=tk.W, pady=12)
         frame_time_transfer = ttk.Frame(frame)
-        frame_time_transfer.grid(row=0, column=1, sticky=tk.W, pady=10)
+        frame_time_transfer.grid(row=0, column=1, sticky=tk.W, pady=12)
         
         now = datetime.now()
-        self.entry_transfer_date = ttk.Entry(frame_time_transfer, width=12)
+        self.entry_transfer_date = ttk.Entry(frame_time_transfer, width=14)
         self.entry_transfer_date.insert(0, now.strftime("%Y-%m-%d"))
-        self.entry_transfer_date.pack(side=tk.LEFT, padx=2)
+        self.entry_transfer_date.pack(side=tk.LEFT, padx=3)
         ttk.Label(frame_time_transfer, text=" ").pack(side=tk.LEFT)
-        self.entry_transfer_time = ttk.Entry(frame_time_transfer, width=10)
+        self.entry_transfer_time = ttk.Entry(frame_time_transfer, width=12)
         self.entry_transfer_time.insert(0, now.strftime("%H:%M:%S"))
-        self.entry_transfer_time.pack(side=tk.LEFT, padx=2)
+        self.entry_transfer_time.pack(side=tk.LEFT, padx=3)
 
-        ttk.Label(frame, text="金额:").grid(row=1, column=0, sticky=tk.W, pady=10)
-        self.entry_transfer_amount = ttk.Entry(frame, width=30)
-        self.entry_transfer_amount.grid(row=1, column=1, padx=10, pady=10)
+        ttk.Label(frame, text="转出账户:").grid(row=1, column=0, sticky=tk.W, pady=12)
+        self.combo_transfer_from = ttk.Combobox(frame, state="readonly", width=37)
+        self.combo_transfer_from.grid(row=1, column=1, padx=12, pady=12)
 
-        ttk.Label(frame, text="转入账户:").grid(row=2, column=0, sticky=tk.W, pady=10)
-        self.combo_transfer_to = ttk.Combobox(frame, state="readonly", width=27)
-        self.combo_transfer_to.grid(row=2, column=1, padx=10, pady=10)
+        ttk.Label(frame, text="转入账户:").grid(row=2, column=0, sticky=tk.W, pady=12)
+        self.combo_transfer_to = ttk.Combobox(frame, state="readonly", width=37)
+        self.combo_transfer_to.grid(row=2, column=1, padx=12, pady=12)
 
-        ttk.Label(frame, text="备注:").grid(row=3, column=0, sticky=tk.W, pady=10)
-        self.entry_transfer_desc = ttk.Entry(frame, width=30)
-        self.entry_transfer_desc.grid(row=3, column=1, padx=10, pady=10)
+        ttk.Label(frame, text="金额:").grid(row=3, column=0, sticky=tk.W, pady=12)
+        self.entry_transfer_amount = ttk.Entry(frame, width=40)
+        self.entry_transfer_amount.grid(row=3, column=1, padx=12, pady=12)
 
-        ttk.Button(frame, text="执行转账", command=self._transfer).grid(row=4, column=0, columnspan=2, pady=20)
+        ttk.Label(frame, text="备注:").grid(row=4, column=0, sticky=tk.W, pady=12)
+        self.entry_transfer_desc = ttk.Entry(frame, width=40)
+        self.entry_transfer_desc.grid(row=4, column=1, padx=12, pady=12)
+
+        ttk.Button(frame, text="执行转账", command=self._transfer).grid(row=5, column=0, columnspan=2, pady=25)
 
     def _create_transactions_tab(self):
         frame_filter = ttk.Frame(self.tab_transactions, padding=10)
@@ -493,6 +497,7 @@ class LedgerApp:
         account_list = [(acc.id, acc.name) for acc in accounts]
         values = [f"{name} ({acc_id[:8]})" for acc_id, name in account_list]
         self.combo_select_account["values"] = values
+        self.combo_transfer_from["values"] = values
         self.combo_transfer_to["values"] = values
 
         if accounts and self.combo_select_account.current() == -1:
@@ -825,13 +830,18 @@ class LedgerApp:
             messagebox.showerror("错误", "记录失败，请检查余额是否足够")
 
     def _transfer(self):
-        if not self.current_account_id:
-            messagebox.showwarning("提示", "请先选择转出账户")
+        from_index = self.combo_transfer_from.current()
+        if from_index == -1:
+            messagebox.showwarning("提示", "请选择转出账户")
             return
 
         to_index = self.combo_transfer_to.current()
         if to_index == -1:
             messagebox.showwarning("提示", "请选择转入账户")
+            return
+
+        if from_index == to_index:
+            messagebox.showwarning("提示", "转出账户和转入账户不能相同")
             return
 
         amount_str = self.entry_transfer_amount.get().strip()
@@ -851,11 +861,13 @@ class LedgerApp:
             return
 
         accounts = self.storage.get_all_accounts()
-        if to_index >= len(accounts):
+        if from_index >= len(accounts) or to_index >= len(accounts):
             return
+        
+        from_account_id = accounts[from_index].id
         to_account_id = accounts[to_index].id
 
-        transaction = self.ledger.transfer(self.current_account_id, to_account_id, amount, "转账", description, created_at)
+        transaction = self.ledger.transfer(from_account_id, to_account_id, amount, "转账", description, created_at)
         if transaction:
             messagebox.showinfo("成功", "转账成功")
             self.entry_transfer_amount.delete(0, tk.END)
