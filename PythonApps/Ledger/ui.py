@@ -29,21 +29,21 @@ class LedgerApp:
         notebook = ttk.Notebook(self.root)
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        self.tab_accounts = ttk.Frame(notebook)
         self.tab_ledger = ttk.Frame(notebook)
         self.tab_transactions = ttk.Frame(notebook)
+        self.tab_accounts = ttk.Frame(notebook)
         self.tab_statistics = ttk.Frame(notebook)
         self.tab_categories = ttk.Frame(notebook)
 
-        notebook.add(self.tab_accounts, text="账户管理")
         notebook.add(self.tab_ledger, text="动账记录")
         notebook.add(self.tab_transactions, text="交易历史")
+        notebook.add(self.tab_accounts, text="账户管理")
         notebook.add(self.tab_statistics, text="统计报表")
         notebook.add(self.tab_categories, text="类型管理")
 
-        self._create_accounts_tab()
         self._create_ledger_tab()
         self._create_transactions_tab()
+        self._create_accounts_tab()
         self._create_statistics_tab()
         self._create_categories_tab()
 
