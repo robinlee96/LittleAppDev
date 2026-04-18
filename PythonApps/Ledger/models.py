@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import uuid4
 
 
@@ -17,6 +17,15 @@ class TransactionType(Enum):
     INCOME = "收入"
     EXPENSE = "支出"
     TRANSFER = "转账"
+
+
+@dataclass
+class Category:
+    id: str = field(default_factory=lambda: str(uuid4()))
+    name: str = ""
+    transaction_type: TransactionType = TransactionType.EXPENSE
+    parent_id: Optional[str] = None
+    created_at: datetime = field(default_factory=datetime.now)
 
 
 @dataclass
@@ -35,6 +44,7 @@ class Transaction:
     id: str = field(default_factory=lambda: str(uuid4()))
     transaction_type: TransactionType = TransactionType.EXPENSE
     amount: float = 0.0
+    category_id: Optional[str] = None
     category: str = ""
     description: str = ""
     account_id: str = ""
