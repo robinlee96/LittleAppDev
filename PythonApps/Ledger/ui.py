@@ -2,17 +2,59 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, Toplevel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict
 from models import Account, AccountType, TransactionType, Category
 from storage import StorageManager
 from ledger import LedgerManager
 
 
+class Icons:
+    ACCOUNT_SAVINGS = "🏦"
+    ACCOUNT_NETWORK = "📱"
+    ACCOUNT_LOAN = "💳"
+    ACCOUNT_PROVIDENT = "🏠"
+    
+    TRANSACTION_INCOME = "💰"
+    TRANSACTION_EXPENSE = "💸"
+    TRANSACTION_TRANSFER = "🔄"
+    
+    CATEGORY_FOOD = "🍜"
+    CATEGORY_TRANSPORT = "🚗"
+    CATEGORY_SHOPPING = "🛒"
+    CATEGORY_HOUSING = "🏡"
+    CATEGORY_ENTERTAINMENT = "🎮"
+    CATEGORY_HEALTH = "🏥"
+    CATEGORY_EDUCATION = "📚"
+    CATEGORY_OTHER = "📋"
+    CATEGORY_SALARY = "💼"
+    CATEGORY_INVESTMENT = "📈"
+    CATEGORY_PARTTIME = "💻"
+    
+    @classmethod
+    def get_account_icon(cls, account_type):
+        icon_map = {
+            AccountType.SAVINGS: cls.ACCOUNT_SAVINGS,
+            AccountType.NETWORK_PAYMENT: cls.ACCOUNT_NETWORK,
+            AccountType.LOAN: cls.ACCOUNT_LOAN,
+            AccountType.PROVIDENT_FUND: cls.ACCOUNT_PROVIDENT
+        }
+        return icon_map.get(account_type, "💰")
+    
+    @classmethod
+    def get_transaction_icon(cls, trans_type):
+        icon_map = {
+            TransactionType.INCOME: cls.TRANSACTION_INCOME,
+            TransactionType.EXPENSE: cls.TRANSACTION_EXPENSE,
+            TransactionType.TRANSFER: cls.TRANSACTION_TRANSFER
+        }
+        return icon_map.get(trans_type, "📋")
+
+
 class LedgerApp:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("记账本")
-        self.root.geometry("1200x800")
+        self.root.title("记账本 💰")
+        self.root.geometry("1300x850")
 
         self.storage = StorageManager()
         self.ledger = LedgerManager(self.storage)
@@ -35,11 +77,11 @@ class LedgerApp:
         self.tab_statistics = ttk.Frame(notebook)
         self.tab_categories = ttk.Frame(notebook)
 
-        notebook.add(self.tab_ledger, text="动账记录")
-        notebook.add(self.tab_transactions, text="交易历史")
-        notebook.add(self.tab_accounts, text="账户管理")
-        notebook.add(self.tab_statistics, text="统计报表")
-        notebook.add(self.tab_categories, text="类型管理")
+        notebook.add(self.tab_ledger, text=f"{Icons.TRANSACTION_INCOME} 动账记录")
+        notebook.add(self.tab_transactions, text=f"{Icons.TRANSACTION_TRANSFER} 交易历史")
+        notebook.add(self.tab_accounts, text=f"{Icons.ACCOUNT_SAVINGS} 账户管理")
+        notebook.add(self.tab_statistics, text="📊 统计报表")
+        notebook.add(self.tab_categories, text="🏷️ 类型管理")
 
         self._create_ledger_tab()
         self._create_transactions_tab()
@@ -48,54 +90,54 @@ class LedgerApp:
         self._create_categories_tab()
 
     def _create_accounts_tab(self):
-        frame_total = ttk.LabelFrame(self.tab_accounts, text="总览", padding=10)
-        frame_total.pack(fill=tk.X, padx=10, pady=10)
-        self.label_total_balance = ttk.Label(frame_total, text="总余额: 0.00", font=("Arial", 14, "bold"))
+        frame_total = ttk.LabelFrame(self.tab_accounts, text="💰 总览", padding=12)
+        frame_total.pack(fill=tk.X, padx=12, pady=12)
+        self.label_total_balance = ttk.Label(frame_total, text="总余额: 0.00", font=("Microsoft YaHei UI", 16, "bold"))
         self.label_total_balance.pack(anchor=tk.W)
 
-        frame_input = ttk.LabelFrame(self.tab_accounts, text="添加/编辑账户", padding=10)
-        frame_input.pack(fill=tk.X, padx=10, pady=10)
+        frame_input = ttk.LabelFrame(self.tab_accounts, text="➕ 添加/编辑账户", padding=12)
+        frame_input.pack(fill=tk.X, padx=12, pady=12)
 
-        ttk.Label(frame_input, text="账户名称:").grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.entry_account_name = ttk.Entry(frame_input, width=30)
-        self.entry_account_name.grid(row=0, column=1, padx=5, pady=5)
+        ttk.Label(frame_input, text="账户名称:").grid(row=0, column=0, sticky=tk.W, pady=6)
+        self.entry_account_name = ttk.Entry(frame_input, width=35)
+        self.entry_account_name.grid(row=0, column=1, padx=8, pady=6)
 
-        ttk.Label(frame_input, text="账户类型:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.combo_account_type = ttk.Combobox(frame_input, values=[t.value for t in AccountType], state="readonly", width=27)
+        ttk.Label(frame_input, text="账户类型:").grid(row=1, column=0, sticky=tk.W, pady=6)
+        self.combo_account_type = ttk.Combobox(frame_input, values=[t.value for t in AccountType], state="readonly", width=32)
         self.combo_account_type.current(0)
-        self.combo_account_type.grid(row=1, column=1, padx=5, pady=5)
+        self.combo_account_type.grid(row=1, column=1, padx=8, pady=6)
 
-        ttk.Label(frame_input, text="当前余额:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.entry_account_balance = ttk.Entry(frame_input, width=30)
-        self.entry_account_balance.grid(row=2, column=1, padx=5, pady=5)
+        ttk.Label(frame_input, text="当前余额:").grid(row=2, column=0, sticky=tk.W, pady=6)
+        self.entry_account_balance = ttk.Entry(frame_input, width=35)
+        self.entry_account_balance.grid(row=2, column=1, padx=8, pady=6)
 
-        ttk.Label(frame_input, text="银行/机构:").grid(row=3, column=0, sticky=tk.W, pady=5)
-        self.entry_bank_name = ttk.Entry(frame_input, width=30)
-        self.entry_bank_name.grid(row=3, column=1, padx=5, pady=5)
+        ttk.Label(frame_input, text="银行/机构:").grid(row=3, column=0, sticky=tk.W, pady=6)
+        self.entry_bank_name = ttk.Entry(frame_input, width=35)
+        self.entry_bank_name.grid(row=3, column=1, padx=8, pady=6)
 
         frame_buttons = ttk.Frame(frame_input)
-        frame_buttons.grid(row=4, column=0, columnspan=2, pady=10)
+        frame_buttons.grid(row=4, column=0, columnspan=2, pady=12)
         self.btn_add_account = ttk.Button(frame_buttons, text="添加账户", command=self._add_or_update_account)
-        self.btn_add_account.pack(side=tk.LEFT, padx=5)
+        self.btn_add_account.pack(side=tk.LEFT, padx=8)
         self.btn_clear_account = ttk.Button(frame_buttons, text="清空/取消编辑", command=self._clear_account_form)
-        self.btn_clear_account.pack(side=tk.LEFT, padx=5)
+        self.btn_clear_account.pack(side=tk.LEFT, padx=8)
 
-        frame_list = ttk.LabelFrame(self.tab_accounts, text="账户列表", padding=10)
-        frame_list.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        frame_list = ttk.LabelFrame(self.tab_accounts, text="📋 账户列表", padding=12)
+        frame_list.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
 
         columns = ("name", "type", "balance", "bank", "created")
-        self.tree_accounts = ttk.Treeview(frame_list, columns=columns, show="headings", selectmode="browse")
+        self.tree_accounts = ttk.Treeview(frame_list, columns=columns, show="headings", selectmode="browse", height=10)
         self.tree_accounts.heading("name", text="账户名称")
         self.tree_accounts.heading("type", text="账户类型")
         self.tree_accounts.heading("balance", text="当前余额")
         self.tree_accounts.heading("bank", text="银行/机构")
         self.tree_accounts.heading("created", text="创建时间")
 
-        self.tree_accounts.column("name", width=150)
-        self.tree_accounts.column("type", width=120)
-        self.tree_accounts.column("balance", width=120)
-        self.tree_accounts.column("bank", width=150)
-        self.tree_accounts.column("created", width=180)
+        self.tree_accounts.column("name", width=220)
+        self.tree_accounts.column("type", width=140)
+        self.tree_accounts.column("balance", width=140)
+        self.tree_accounts.column("bank", width=180)
+        self.tree_accounts.column("created", width=200)
 
         scrollbar = ttk.Scrollbar(frame_list, orient=tk.VERTICAL, command=self.tree_accounts.yview)
         self.tree_accounts.configure(yscrollcommand=scrollbar.set)
@@ -109,27 +151,27 @@ class LedgerApp:
         ttk.Button(frame_actions, text="删除选中账户", command=self._delete_account).pack(side=tk.RIGHT)
 
     def _create_ledger_tab(self):
-        frame_select = ttk.LabelFrame(self.tab_ledger, text="选择账户", padding=10)
-        frame_select.pack(fill=tk.X, padx=10, pady=10)
+        frame_select = ttk.LabelFrame(self.tab_ledger, text="💳 选择账户", padding=12)
+        frame_select.pack(fill=tk.X, padx=12, pady=12)
 
-        ttk.Label(frame_select, text="当前账户:").pack(side=tk.LEFT, padx=5)
-        self.combo_select_account = ttk.Combobox(frame_select, state="readonly", width=40)
-        self.combo_select_account.pack(side=tk.LEFT, padx=5)
-        self.combo_select_account.bind("<<ComboboxSelected>>", self._on_account_selected)
+        ttk.Label(frame_select, text="当前账户:").pack(side=tk.LEFT, padx=8)
+        self.combo_select_account = ttk.Combobox(frame_select, state="readonly", width=50)
+        self.combo_select_account.pack(side=tk.LEFT, padx=8)
+        self.combo_select_account.bind("&lt;&lt;ComboboxSelected&gt;&gt;", self._on_account_selected)
 
-        self.label_balance = ttk.Label(frame_select, text="余额: --", font=("Arial", 12, "bold"))
-        self.label_balance.pack(side=tk.LEFT, padx=20)
+        self.label_balance = ttk.Label(frame_select, text="余额: --", font=("Microsoft YaHei UI", 14, "bold"))
+        self.label_balance.pack(side=tk.LEFT, padx=25)
 
         notebook_ledger = ttk.Notebook(self.tab_ledger)
-        notebook_ledger.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        notebook_ledger.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
 
         self.tab_income = ttk.Frame(notebook_ledger)
         self.tab_expense = ttk.Frame(notebook_ledger)
         self.tab_transfer = ttk.Frame(notebook_ledger)
 
-        notebook_ledger.add(self.tab_income, text="收入")
-        notebook_ledger.add(self.tab_expense, text="支出")
-        notebook_ledger.add(self.tab_transfer, text="转账")
+        notebook_ledger.add(self.tab_income, text=f"{Icons.TRANSACTION_INCOME} 收入")
+        notebook_ledger.add(self.tab_expense, text=f"{Icons.TRANSACTION_EXPENSE} 支出")
+        notebook_ledger.add(self.tab_transfer, text=f"{Icons.TRANSACTION_TRANSFER} 转账")
 
         self._create_income_widgets()
         self._create_expense_widgets()
@@ -404,8 +446,9 @@ class LedgerApp:
         for item in self.tree_accounts.get_children():
             self.tree_accounts.delete(item)
         for account in self.storage.get_all_accounts():
+            icon = Icons.get_account_icon(account.account_type)
             self.tree_accounts.insert("", tk.END, values=(
-                account.name,
+                f"{icon} {account.name}",
                 account.account_type.value,
                 f"{account.balance:.2f}",
                 account.bank_name or "-",
@@ -429,14 +472,15 @@ class LedgerApp:
                 transactions = [t for t in transactions if t.created_at.month == month]
         
         for t in transactions:
+            icon = Icons.get_transaction_icon(t.transaction_type)
             account = self.storage.get_account(t.account_id)
             account_name = account.name if account else "-"
             if t.transaction_type == TransactionType.TRANSFER and t.target_account_id:
                 target_account = self.storage.get_account(t.target_account_id)
                 target_name = target_account.name if target_account else "-"
-                account_name = f"{account_name} -> {target_name}"
+                account_name = f"{account_name} -&gt; {target_name}"
             self.tree_transactions.insert("", tk.END, values=(
-                t.transaction_type.value,
+                f"{icon} {t.transaction_type.value}",
                 f"{t.amount:.2f}",
                 t.category,
                 t.description,
